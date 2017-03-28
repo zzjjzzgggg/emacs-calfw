@@ -2213,14 +2213,9 @@ return an alist of rendering parameters."
                                         date raw-periods cell-width))
                                      (mapcar 'cfw:render-default-content-face
                                              raw-contents)))
-         for num-label = (if prs-contents
-                             (format "(%s)"
-                                     (+ (length raw-contents)
-                                        (length raw-periods))) "")
          for tday = (concat
                      " " ; margin
                      (funcall title-func date week-day hday)
-                     (if num-label (concat " " num-label))
                      (if hday (concat " " (cfw:rt (substring hday 0)
                                                   'cfw:face-holiday))))
          collect
