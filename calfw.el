@@ -440,6 +440,11 @@ ones of DATE2. Otherwise is `nil'."
   (calendar-gregorian-from-absolute
    (+ (calendar-absolute-from-gregorian date) num)))
 
+(defun cfw:date-before (date num)
+  "Return the date before NUM days from DATE."
+  (calendar-gregorian-from-absolute
+   (- (calendar-absolute-from-gregorian date) num)))
+
 (defun cfw:strtime-emacs (time)
   "Format emacs time value TIME to the string form YYYY/MM/DD."
   (format-time-string "%Y/%m/%d" time))
@@ -2333,14 +2338,22 @@ mainly used at functions for putting overlays."
 this function returns nil."
   (loop with pos = (cfw:dest-point-min dest)
         with end = (cfw:dest-point-max dest)
+        with last-found = nil
         for next = (next-single-property-change pos 'cfw:date nil end)
         for text-date = (and next (cfw:cursor-to-date next))
         for text-row-count = (and next (get-text-property next 'cfw:row-count))
         while (and next (< next end)) do
         (when (and text-date (equal date text-date)
                    (eql row-count text-row-count))
+          ;; this is needed item
           (return next))
-        (setq pos next)))
+        (when (and text-date (equal date text-date)
+                   text-row-count)
+          ;; keep it to search bottom item
+          (setq last-found next))
+        (setq pos next)
+        finally (if (and last-found (< row-count 0))
+                    (return last-found))))
 
 (defun cfw:navi-goto-date (date)
   "Move the cursor to DATE and put selection. If DATE is not
@@ -2386,7 +2399,10 @@ calendar view."
      ("t" . cfw:navi-goto-today-command)
      ("." . cfw:navi-goto-today-command)
 
-     ("TAB" . cfw:navi-next-item-command)
+     ("TAB"       . cfw:navi-next-item-command)
+     ("C-i"       . cfw:navi-next-item-command)
+     ("<backtab>"   . cfw:navi-prev-item-command)
+     ("S-TAB"       . cfw:navi-prev-item-command)
 
      ("r"   . cfw:refresh-calendar-buffer)
      ("SPC" . cfw:show-details-command)
@@ -2471,6 +2487,17 @@ calendar view."
         (count (or (get-text-property (point) 'cfw:row-count) -1)))
     (when (and cp date)
       (let ((next (cfw:find-item (cfw:component-dest cp) date (1+ count))))
+        (if next (goto-char next)
+          (cfw:navi-goto-date date))))))
+
+(defun cfw:navi-prev-item-command ()
+  "Move the cursor to the previous item."
+  (interactive)
+  (let ((cp (cfw:cp-get-component))
+        (date (cfw:cursor-to-date))
+        (count (or (get-text-property (point) 'cfw:row-count) -1)))
+    (when (and cp date)
+      (let ((next (cfw:find-item (cfw:component-dest cp) date (1- count))))
         (if next (goto-char next)
           (cfw:navi-goto-date date))))))
 
@@ -2678,6 +2705,9 @@ DATE is a date to show. MODEL is model object."
      ("b"       . cfw:details-navi-prev-command)
      ("<left>"  . cfw:details-navi-prev-command)
      ("TAB"     . cfw:details-navi-next-item-command)
+     ("C-i"     . cfw:details-navi-next-item-command)
+     ("<backtab>" . cfw:details-navi-prev-item-command)
+     ("S-TAB"     . cfw:details-navi-prev-item-command)
      ))
   "Default key map for the details buffer.")
 
@@ -2725,6 +2755,12 @@ DATE is a date to show. MODEL is model object."
   (interactive)
   (let* ((count (or (get-text-property (point) 'cfw:row-count) -1))
          (next (cfw:details-find-item (1+ count))))
+    (goto-char (or next (point-min)))))
+
+(defun cfw:details-navi-prev-item-command ()
+  (interactive)
+  (let* ((count (or (get-text-property (point) 'cfw:row-count) -1))
+         (next (cfw:details-find-item (1- count))))
     (goto-char (or next (point-min)))))
 
 (defun cfw:details-find-item (row-count)
